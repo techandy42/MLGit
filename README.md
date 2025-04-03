@@ -1,4 +1,4 @@
-# 🧠 MLGit
+# 🧠 MLGit (Preview)
 
 > A local, open-source codebase indexer that makes your code LLM-friendly — compressing, summarizing, and structuring large repositories for AI-powered tools.
 
@@ -156,8 +156,8 @@ MLGit stores everything **locally** — nothing is uploaded to any cloud by defa
 
 ## 🧱 Project Roadmap
 
-- [x] File/function/class summarizer
-- [x] CLI: `init`, `index`, `reindex`
+- [ ] File/function/class summarizer
+- [ ] CLI: `init`, `index`, `reindex`
 - [ ] VSCode extension
 - [ ] Multi-language support (Python, JS, Go, etc.)
 - [ ] Plugin support for LLM agents (e.g. LangChain, LlamaIndex)
