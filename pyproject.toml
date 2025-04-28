@@ -1,0 +1,16 @@
+[tool.poetry]
+name = "mlgit"
+version = "0.1.0"
+description = "MLGit: Index Codebase into Natural Language Descriptions; Works Just Like Git."
+authors = ["Hokyung (Andy) Lee <techandy42@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+
+[tool.poetry.scripts]
+mlgit = "mlgit.cli:main"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
