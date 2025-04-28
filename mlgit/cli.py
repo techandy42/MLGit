@@ -54,7 +54,6 @@ def main():
         print_import_graph(graph)
 
         queue = process_modules(graph)
-        print(queue)
         print_processing_queue(queue)
 
     else:

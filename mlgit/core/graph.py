@@ -257,7 +257,7 @@ def print_processing_queue(queue: List[FrozenSet[Path]]) -> None:
     """
     print("\nProcessing order:")
     for comp in queue:
-        if len(comp) > 1:
-            print("Group:")
+        print("-" * 40)
         for f in sorted(comp, key=lambda p: str(p)):
             print("  -", f)
+    print("-" * 40)
