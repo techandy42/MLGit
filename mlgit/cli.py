@@ -1,32 +1,62 @@
 import argparse
+import os
 import subprocess
+import sys
 from pathlib import Path
+from mlgit.core.graph import (
+    build_import_graph,
+    print_import_graph,
+    process_modules,
+    print_processing_queue,
+)
 
-# For finding the top-level Git repository; used for indexing
 def find_git_root() -> Path:
-    """Return the top-level Git repository path or cwd if not in a repo."""
+    """
+    Look in the original shell directory (from $PWD) for the Git root.
+    If PWD isn’t set or it’s not inside a Git repo, exit with an error.
+    """
+    shell_pwd = os.environ.get("PWD")
+    if not shell_pwd:
+        print("Error: could not determine your working directory (PWD is unset)", file=sys.stderr)
+        sys.exit(1)
+
+    search_dir = Path(shell_pwd)
+
     try:
         top = subprocess.check_output(
             ["git", "rev-parse", "--show-toplevel"],
+            cwd=str(search_dir),
             stderr=subprocess.DEVNULL,
         ).decode().strip()
         return Path(top)
     except subprocess.CalledProcessError:
-        return Path.cwd()
+        print(f"Error: '{search_dir}' is not inside a Git repository", file=sys.stderr)
+        sys.exit(1)
 
 def main():
     parser = argparse.ArgumentParser(
         description="MLGit: Index Codebase into Natural Language Descriptions; Works Just Like Git."
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
+
     subparsers.add_parser("init", help="Initialize a new MLGit repository")
-    subparsers.add_parser("index", help="Index the current repository")
+    subparsers.add_parser("index", help="Index the current repository and show graphs")
 
     args = parser.parse_args()
+
     if args.command == "init":
         print("mlgit init")
+
     elif args.command == "index":
-        print("mlgit index")
+        repo_root = find_git_root()
+
+        graph = build_import_graph(repo_root)
+        print_import_graph(graph)
+
+        queue = process_modules(graph)
+        print(queue)
+        print_processing_queue(queue)
+
     else:
         parser.print_help()
 

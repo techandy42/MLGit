@@ -5,8 +5,10 @@
 ## Running Locally
 
 ```bash
-poetry run python -m mlgit.cli init     # “mlgit init"
-poetry run python -m mlgit.cli index    # “mlgit index”
+poetry --directory /Users/andylee/Desktop/summer_2025/MLGit \
+       run python -m mlgit.cli init
+poetry --directory /Users/andylee/Desktop/summer_2025/MLGit \
+       run python -m mlgit.cli index    
 ```
 
 ---
