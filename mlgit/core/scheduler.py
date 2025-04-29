@@ -2,7 +2,7 @@ import os
 import time
 from pathlib import Path
 from queue import PriorityQueue
-from concurrent.futures import ProcessPoolExecutor, wait, FIRST_COMPLETED
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, wait, FIRST_COMPLETED
 
 from mlgit.core.graph import (
     build_import_graph,
@@ -10,6 +10,7 @@ from mlgit.core.graph import (
     estimate_component_weights,
     compute_critical_path,
 )
+
 
 def test_index_modules(file_paths):
     """
@@ -28,35 +29,59 @@ def test_index_modules(file_paths):
     return [str(p) for p in file_paths]
 
 
-def index_modules(file_paths):
+def statically_index_modules(file_paths):
     """
-    Placeholder for the actual module indexing function.
+    Placeholder for static AST-based indexing of modules.
 
     Args:
         file_paths (List[Path]): Files in the SCC group.
 
     Returns:
-        List[str]: The string paths of processed files (if applicable).
+        List[str]: The string paths of processed files.
     """
-    # TODO: replace with real processing logic
+    # TODO: implement AST extraction & serialization
     return [str(p) for p in file_paths]
 
 
-def schedule(repo_root: Path, max_workers: int = None, test_mode: bool = False):
+def dynamically_index_modules(file_paths):
+    """
+    Placeholder for dynamic LLM-based enrichment of modules.
+
+    Args:
+        file_paths (List[Path]): Files in the SCC group.
+
+    Returns:
+        List[str]: The string paths of processed files.
+    """
+    # TODO: implement LLM request & enrichment
+    return [str(p) for p in file_paths]
+
+
+def schedule(repo_root: Path, max_workers: int = None, mode: str = 'dynamic'):
     """
     Orchestrate parallel, dependency-aware indexing of Python files in a Git repo.
 
     Args:
         repo_root (Path): Path to the Git repository root.
         max_workers (int, optional): Number of parallel worker processes (defaults to CPU count).
-        test_mode (bool): If True, use test_index_modules and print processing order; otherwise use index_modules and suppress printing.
+        mode (str): 'static' for AST-only pass, 'dynamic' for LLM pass, 'test' for test simulation.
     """
     # Determine worker count
     if max_workers is None:
         max_workers = os.cpu_count() or 1
 
-    # Choose processing function
-    process_fn = test_index_modules if test_mode else index_modules
+    # Select processing function and executor based on mode
+    if mode == 'static':
+        process_fn = statically_index_modules
+        executor_cls = ProcessPoolExecutor
+    elif mode == 'dynamic':
+        process_fn = dynamically_index_modules
+        executor_cls = ThreadPoolExecutor
+    elif mode == 'test':
+        process_fn = test_index_modules
+        executor_cls = ThreadPoolExecutor
+    else:
+        raise ValueError(f"Unknown mode: {mode}. Expected 'static', 'dynamic', or 'test'.")
 
     # Step 1: Build the import graph and collapse into SCCs
     graph = build_import_graph(repo_root)
@@ -97,7 +122,7 @@ def schedule(repo_root: Path, max_workers: int = None, test_mode: bool = False):
     processed_comps = []
 
     # Step 5: Worker pool for parallel processing
-    with ProcessPoolExecutor(max_workers=max_workers) as executor:
+    with executor_cls(max_workers=max_workers) as executor:
         futures = {}
 
         # Submit initial tasks up to max_workers
@@ -112,21 +137,23 @@ def schedule(repo_root: Path, max_workers: int = None, test_mode: bool = False):
             for fut in done:
                 comp = futures.pop(fut)
                 result_paths = fut.result()
-                if test_mode:
+                if mode == 'test':
                     processed_comps.append((comp, result_paths))
 
+                # Enqueue dependents whose indegree drops to zero
                 for child in comp_out[comp]:
                     indegree[child] -= 1
                     if indegree[child] == 0:
                         ready.put((-cp_lengths[child], child))
 
+            # Fill available worker slots
             while not ready.empty() and len(futures) < max_workers:
                 _, comp = ready.get()
                 future = executor.submit(process_fn, list(comp))
                 futures[future] = comp
 
     # Print out final processing order, grouped by SCC in test mode
-    if test_mode:
+    if mode == 'test':
         print("Processing order:")
         for comp, paths in processed_comps:
             print("-" * 40)
@@ -138,4 +165,5 @@ def schedule(repo_root: Path, max_workers: int = None, test_mode: bool = False):
 if __name__ == "__main__":
     import sys
     root = Path(sys.argv[1]) if len(sys.argv) > 1 else Path.cwd()
-    schedule(root, test_mode=True)
+    # Run in test mode by default when executed as a script
+    schedule(root, mode='test')

@@ -44,7 +44,7 @@ def main():
 
     elif args.command == "index":
         repo_root = find_git_root()
-        schedule(repo_root, test_mode=True)
+        schedule(repo_root, mode='test')
 
     else:
         parser.print_help()
