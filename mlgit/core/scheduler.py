@@ -29,9 +29,9 @@ def test_index_modules(file_paths):
     return [str(p) for p in file_paths]
 
 
-def statically_index_modules(file_paths):
+def ast_index_modules(file_paths):
     """
-    Placeholder for static AST-based indexing of modules.
+    Placeholder for AST-based indexing of modules.
 
     Args:
         file_paths (List[Path]): Files in the SCC group.
@@ -43,9 +43,9 @@ def statically_index_modules(file_paths):
     return [str(p) for p in file_paths]
 
 
-def dynamically_index_modules(file_paths):
+def llm_index_modules(file_paths):
     """
-    Placeholder for dynamic LLM-based enrichment of modules.
+    Placeholder for LLM-based enrichment of modules.
 
     Args:
         file_paths (List[Path]): Files in the SCC group.
@@ -57,31 +57,31 @@ def dynamically_index_modules(file_paths):
     return [str(p) for p in file_paths]
 
 
-def schedule(repo_root: Path, max_workers: int = None, mode: str = 'dynamic'):
+def schedule(repo_root: Path, max_workers: int = None, mode: str = 'llm'):
     """
     Orchestrate parallel, dependency-aware indexing of Python files in a Git repo.
 
     Args:
         repo_root (Path): Path to the Git repository root.
         max_workers (int, optional): Number of parallel worker processes (defaults to CPU count).
-        mode (str): 'static' for AST-only pass, 'dynamic' for LLM pass, 'test' for test simulation.
+        mode (str): 'ast' for AST-only pass, 'llm' for LLM pass, 'test' for test simulation.
     """
     # Determine worker count
     if max_workers is None:
         max_workers = os.cpu_count() or 1
 
     # Select processing function and executor based on mode
-    if mode == 'static':
-        process_fn = statically_index_modules
+    if mode == 'ast':
+        process_fn = ast_index_modules
         executor_cls = ProcessPoolExecutor
-    elif mode == 'dynamic':
-        process_fn = dynamically_index_modules
+    elif mode == 'llm':
+        process_fn = llm_index_modules
         executor_cls = ThreadPoolExecutor
     elif mode == 'test':
         process_fn = test_index_modules
         executor_cls = ThreadPoolExecutor
     else:
-        raise ValueError(f"Unknown mode: {mode}. Expected 'static', 'dynamic', or 'test'.")
+        raise ValueError(f"Unknown mode: {mode}. Expected 'ast', 'llm', or 'test'.")
 
     # Step 1: Build the import graph and collapse into SCCs
     graph = build_import_graph(repo_root)
