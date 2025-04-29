@@ -3,6 +3,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from mlgit.core.initializer import init_repo
 from mlgit.core.scheduler import schedule
 
 def find_git_root() -> Path:
@@ -38,12 +39,12 @@ def main():
     subparsers.add_parser("index", help="Index the current repository and show graphs")
 
     args = parser.parse_args()
+    repo_root = find_git_root()
 
     if args.command == "init":
-        print("mlgit init")
+        init_repo(repo_root)
 
     elif args.command == "index":
-        repo_root = find_git_root()
         schedule(repo_root, mode='test')
 
     else:
