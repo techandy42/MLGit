@@ -3,12 +3,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from mlgit.core.graph import (
-    build_import_graph,
-    print_import_graph,
-    process_modules,
-    print_processing_queue,
-)
+from mlgit.core.scheduler import schedule
 
 def find_git_root() -> Path:
     """
@@ -49,12 +44,7 @@ def main():
 
     elif args.command == "index":
         repo_root = find_git_root()
-
-        graph = build_import_graph(repo_root)
-        print_import_graph(graph)
-
-        queue = process_modules(graph)
-        print_processing_queue(queue)
+        schedule(repo_root)
 
     else:
         parser.print_help()
