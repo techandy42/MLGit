@@ -1,3 +1,46 @@
+"""
+Module: mlgit.core.scheduler
+
+This module orchestrates parallel, dependency‐aware indexing of Python source files
+in a Git repository. It provides three distinct modes of operation:
+
+1) Static Analysis Mode (`ast`)
+   - Uses a `ProcessPoolExecutor` to perform AST‐based extraction and serialization
+     for each strongly‐connected component (SCC) of the import graph.
+   - Implements:
+     * `build_import_graph` to discover file‐to‐file dependencies.
+     * `find_sccs` to collapse import cycles into SCCs.
+     * `estimate_component_weights` and `compute_critical_path` for prioritization.
+     * A dependency‐respecting, critical‐path‐driven ready queue.
+
+2) Dynamic Analysis Mode (`llm`)
+   - Uses a `ThreadPoolExecutor` to issue LLM enrichment requests for each SCC,
+     reading the previously written AST “raw” output and writing back “enriched” JSON.
+   - Shares the same dependency graph and prioritization logic as static mode,
+     but swaps compute‐bound workers for I/O‐bound threads.
+
+3) Test Mode (`test`)
+   - Also uses a `ThreadPoolExecutor` to simulate processing by sleeping
+     proportional to file size, and prints out the completion order grouped by SCC.
+   - Provides the `test_index_modules` stub to validate scheduling behavior
+     without external dependencies.
+
+The core function `schedule(repo_root: Path, max_workers: int, mode: str)`:
+   - Builds the import graph and SCCs.
+   - Constructs a provider→consumer DAG and calculates indegrees.
+   - Computes component weights and critical‐path lengths.
+   - Maintains a priority queue of ready SCCs.
+   - Dispatches tasks to the appropriate executor, re‐enqueueing dependents
+     only when all producers finish.
+   - In test mode, records and prints the order of processed files.
+
+When invoked as a script (`__main__`), the scheduler runs in `test` mode by default.
+
+Author: Hokyung (Andy) Lee  
+Email: techandy42@gamil.com  
+Date: April 28, 2025
+"""
+
 import os
 import time
 from pathlib import Path

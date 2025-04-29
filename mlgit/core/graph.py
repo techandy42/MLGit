@@ -1,36 +1,32 @@
 """
 Module: mlgit.core.graph
 
-This module builds an import‐statement dependency graph for a given Git repository,
-then groups and schedules the resulting strongly‐connected components (SCCs)
-for optimal processing.  
+This module provides functions to analyze Python source files in a Git repository by:
 
 1) Dependency Graph Construction
-   - Use `git ls-tree -r --name-only HEAD` to list every committed `.py` file.
-   - Map each file’s module name (derived from its path) to its filesystem path.
-   - For each file:
-     * Read its on‐disk source and parse the AST.
-     * Walk `ast.Import` and `ast.ImportFrom` nodes.
-     * Perform a longest‐prefix lookup against the module map so that
-       imports like `pkg.subpkg.mod` match the deepest available module.
-     * Build an adjacency list mapping each file → set of files it imports.
-   - Ensure files with no imports still appear as isolated nodes.
+   - Uses `git ls-tree -r --name-only HEAD` to list every committed `.py` file.
+   - Maps each file’s module name (derived from its path) to its filesystem path.
+   - Parses each file’s AST to extract `import` and `from ... import` statements.
+   - Resolves imports via a longest-prefix match against the module map.
+   - Builds an adjacency list mapping each file → set of files it imports.
+   - Ensures files with no imports still appear as isolated nodes.
 
-2) SCC Grouping & Weighted Topological Scheduling
-   - Run Tarjan’s algorithm to collapse any import‐cycles into SCCs (each SCC
-     becomes a single processing unit).
-   - Construct a condensed DAG whose edges run from each provider component
-     → each consumer component (i.e. “provider imports → consumer”).
-   - Estimate a weight for each component (sum of on‐disk byte sizes) as
-     a proxy for processing cost.
-   - Compute each component’s critical‐path length (longest total weight
-     to any leaf) via a reverse topological DP.
-   - Schedule with Kahn’s algorithm, maintaining a ready set of components
-     with no unmet dependencies.  Always pick the ready component with the
-     largest critical‐path length first.  
-     * This guarantees **producer-before-consumer** (no consumer runs before
-       its providers), and within each dependency “layer,” it schedules
-       **bigger before smaller** tasks to minimize overall I/O wait time.
+2) Strongly-Connected Component Analysis
+   - Runs Tarjan’s algorithm to collapse import cycles into SCCs.
+   - Returns each SCC as a frozenset of file paths.
+
+3) Component Weight Estimation
+   - Estimates each component’s weight by summing on-disk byte sizes of its files.
+
+4) Critical-Path Computation
+   - Given a DAG of provider→consumer edges and per-component weights,
+     computes each component’s critical-path length (longest total weight to any leaf)
+     via a reverse topological DP.
+
+5) Utilities
+   - `print_import_graph`: Pretty-prints the import graph as JSON.
+
+Note: Scheduling and topological ordering are no longer handled here; see `scheduler.py`.
 
 Author: Hokyung (Andy) Lee
 Email: techandy42@gamil.com
