@@ -1,3 +1,33 @@
+"""
+Module: mlgit.cli
+
+This module implements the command‐line interface for MLGit, providing Git-like
+subcommands to initialize and index a repository:
+
+1) `mlgit init`  
+   - Finds the Git repository root via `find_git_root()`.  
+   - Calls `init_repo()` to bootstrap the `.mlgit/` directory structure and default config.
+
+2) `mlgit index`  
+   - Locates the Git root.  
+   - Invokes the dependency‐aware scheduler (`schedule()`) in test mode by default,
+     which builds the import graph, collapses SCCs, and simulates processing.
+
+Key Functions:
+
+- `find_git_root() -> Path`  
+  Discovers the top-level Git directory from the `$PWD` environment variable,
+  exiting with an error if not inside a Git repo.
+
+- `main()`  
+  Parses subcommands (`init` and `index`), delegates to the appropriate core routines,
+  and prints help for unsupported commands.
+
+Author: Hokyung (Andy) Lee  
+Email: techandy42@gamil.com  
+Date: April 28, 2025
+"""
+
 import argparse
 import os
 import subprocess

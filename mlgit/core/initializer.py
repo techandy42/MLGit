@@ -1,3 +1,28 @@
+"""
+Module: mlgit.core.initializer
+
+This module provides the `mlgit init` functionality, allowing you to bootstrap
+a new MLGit repository in any existing Git project. It performs the following:
+
+1) Creates the `.mlgit/` directory at the repo root.
+2) Within `.mlgit/`, creates two subdirectories:
+   - `raw/`       – for storing AST‐extraction JSON blobs.
+   - `enriched/`  – for storing LLM‐enrichment JSON blobs.
+3) Writes a default `config.json` with sane, versioned defaults for:
+   - The MLGit tool version.
+   - Repository metadata placeholders (`commit`, `branch`).
+   - Scheduler settings (`static_workers`, `dynamic_workers`).
+   - LLM backend settings (`provider`, `model`).
+
+Exports:
+- `init_repo(repo_root: Path)`: Creates the folder structure and default config.
+- `main()`: CLI entrypoint that calls `init_repo` on the current or provided path.
+
+Author: Hokyung (Andy) Lee  
+Email: techandy42@gamil.com  
+Date: April 28, 2025
+"""
+
 import sys
 import json
 from pathlib import Path

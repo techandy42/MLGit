@@ -185,60 +185,6 @@ def compute_critical_path(
     return cp
 
 
-# def process_modules(graph: Dict[Path, Set[Path]]) -> List[FrozenSet[Path]]:
-#     """
-#     Collapse SCCs into components, build a provider→consumer DAG,
-#     then schedule components by descending critical-path length
-#     while ensuring all producers come before their consumers.
-#     """
-#     # 1) SCC collapse
-#     sccs = find_sccs(graph)
-#     comp_map: Dict[Path, FrozenSet[Path]] = {}
-#     for comp in sccs:
-#         for f in comp:
-#             comp_map[f] = comp
-
-#     # add singleton components
-#     all_comps: Set[FrozenSet[Path]] = set(sccs)
-#     for f in graph:
-#         if f not in comp_map:
-#             solo = frozenset({f})
-#             comp_map[f] = solo
-#             all_comps.add(solo)
-
-#     # 2) build provider→consumer DAG
-#     comp_out: Dict[FrozenSet[Path], Set[FrozenSet[Path]]] = {c: set() for c in all_comps}
-#     indegree: Dict[FrozenSet[Path], int] = {c: 0 for c in all_comps}
-
-#     for consumer, deps in graph.items():
-#         consumer_c = comp_map[consumer]
-#         for provider in deps:
-#             provider_c = comp_map[provider]
-#             if provider_c is not consumer_c:
-#                 comp_out[provider_c].add(consumer_c)
-#                 indegree[consumer_c] += 1
-
-#     # 3) compute weights & critical-path lengths
-#     weights = estimate_component_weights(all_comps)
-#     cp_lengths = compute_critical_path(comp_out, weights)
-
-#     # 4) Kahn’s algorithm with weight-priority among ready nodes
-#     ready = [c for c, deg in indegree.items() if deg == 0]
-#     ready.sort(key=lambda c: -cp_lengths[c])
-
-#     ordered: List[FrozenSet[Path]] = []
-#     while ready:
-#         comp = ready.pop(0)
-#         ordered.append(comp)
-#         for consumer_c in comp_out[comp]:
-#             indegree[consumer_c] -= 1
-#             if indegree[consumer_c] == 0:
-#                 ready.append(consumer_c)
-#         ready.sort(key=lambda c: -cp_lengths[c])
-
-#     return ordered
-
-
 def print_import_graph(graph: Dict[Path, Set[Path]]) -> None:
     """
     Pretty-print the import graph as JSON.
@@ -248,16 +194,3 @@ def print_import_graph(graph: Dict[Path, Set[Path]]) -> None:
         for src, dsts in graph.items()
     }
     print(json.dumps(serializable, indent=2))
-
-
-# def print_processing_queue(queue: List[FrozenSet[Path]]) -> None:
-#     """
-#     Print each component (or singleton) in the order they should be processed.
-#     Groups (SCCs) are printed together.
-#     """
-#     print("\nProcessing order:")
-#     for comp in queue:
-#         print("-" * 40)
-#         for f in sorted(comp, key=lambda p: str(p)):
-#             print("  -", f)
-#     print("-" * 40)
