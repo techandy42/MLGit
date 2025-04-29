@@ -11,9 +11,9 @@ from mlgit.core.graph import (
     compute_critical_path,
 )
 
-def test_process(file_paths):
+def test_index_modules(file_paths):
     """
-    Simulate processing of files by sleeping proportional to total file size.
+    Simulate indexing of modules by sleeping proportional to total file size.
 
     Args:
         file_paths (List[Path]): Files in the SCC group.
@@ -28,17 +28,35 @@ def test_process(file_paths):
     return [str(p) for p in file_paths]
 
 
-def schedule(repo_root: Path, max_workers: int = None):
+def index_modules(file_paths):
     """
-    Orchestrate parallel, dependency-aware processing of Python files in a Git repo.
+    Placeholder for the actual module indexing function.
+
+    Args:
+        file_paths (List[Path]): Files in the SCC group.
+
+    Returns:
+        List[str]: The string paths of processed files (if applicable).
+    """
+    # TODO: replace with real processing logic
+    return [str(p) for p in file_paths]
+
+
+def schedule(repo_root: Path, max_workers: int = None, test_mode: bool = False):
+    """
+    Orchestrate parallel, dependency-aware indexing of Python files in a Git repo.
 
     Args:
         repo_root (Path): Path to the Git repository root.
         max_workers (int, optional): Number of parallel worker processes (defaults to CPU count).
+        test_mode (bool): If True, use test_index_modules and print processing order; otherwise use index_modules and suppress printing.
     """
     # Determine worker count
     if max_workers is None:
         max_workers = os.cpu_count() or 1
+
+    # Choose processing function
+    process_fn = test_index_modules if test_mode else index_modules
 
     # Step 1: Build the import graph and collapse into SCCs
     graph = build_import_graph(repo_root)
@@ -75,51 +93,49 @@ def schedule(repo_root: Path, max_workers: int = None):
         if indegree[comp] == 0:
             ready.put((-cp_lengths[comp], comp))
 
-    # Track finished components and their files
+    # Track finished components and their files in test mode
     processed_comps = []
 
     # Step 5: Worker pool for parallel processing
     with ProcessPoolExecutor(max_workers=max_workers) as executor:
-        # Map futures to their corresponding component
         futures = {}
 
         # Submit initial tasks up to max_workers
         while not ready.empty() and len(futures) < max_workers:
             _, comp = ready.get()
-            future = executor.submit(test_process, list(comp))
+            future = executor.submit(process_fn, list(comp))
             futures[future] = comp
 
         # Continue scheduling until all tasks complete
         while futures:
             done, _ = wait(futures.keys(), return_when=FIRST_COMPLETED)
-            # Handle completed tasks
             for fut in done:
                 comp = futures.pop(fut)
                 result_paths = fut.result()
-                processed_comps.append((comp, result_paths))
+                if test_mode:
+                    processed_comps.append((comp, result_paths))
 
-                # Enqueue dependents whose indegree drops to zero
                 for child in comp_out[comp]:
                     indegree[child] -= 1
                     if indegree[child] == 0:
                         ready.put((-cp_lengths[child], child))
 
-            # Fill available worker slots
             while not ready.empty() and len(futures) < max_workers:
                 _, comp = ready.get()
-                future = executor.submit(test_process, list(comp))
+                future = executor.submit(process_fn, list(comp))
                 futures[future] = comp
 
-    # Print out final processing order, grouped by SCC
-    print("Processing order:")
-    for comp, paths in processed_comps:
+    # Print out final processing order, grouped by SCC in test mode
+    if test_mode:
+        print("Processing order:")
+        for comp, paths in processed_comps:
+            print("-" * 40)
+            for path in paths:
+                print(path)
         print("-" * 40)
-        for path in paths:
-            print(path)
-    print("-" * 40)
 
 
 if __name__ == "__main__":
     import sys
     root = Path(sys.argv[1]) if len(sys.argv) > 1 else Path.cwd()
-    schedule(root)
+    schedule(root, test_mode=True)
