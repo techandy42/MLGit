@@ -26,8 +26,6 @@ This module provides functions to analyze Python source files in a Git repositor
 5) Utilities
    - `print_import_graph`: Pretty-prints the import graph as JSON.
 
-Note: Scheduling and topological ordering are no longer handled here; see `scheduler.py`.
-
 Author: Hokyung (Andy) Lee
 Email: techandy42@gamil.com
 Date: April 27, 2025
