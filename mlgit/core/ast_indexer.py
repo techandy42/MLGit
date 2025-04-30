@@ -5,25 +5,43 @@ from typing import Any, Dict, List, Optional, Union
 
 TODO_PATTERN = re.compile(r'#\s*TODO[:\s]*(.*)')
 
-def make_signature(func_node: ast.FunctionDef) -> str:
+def get_signature(func_node: Union[ast.FunctionDef, ast.AsyncFunctionDef]) -> Dict[str, Any]:
     """
-    Generate a signature string for a FunctionDef or AsyncFunctionDef node.
+    Build a nested signature dict for a FunctionDef or AsyncFunctionDef node:
+      - parameters: list of {name: str, annotation: Optional[str], default: Optional[str]}
+      - returns: Optional[str]
     """
-    try:
-        # ast.unparse is available in Python 3.9+
-        args_str = ast.unparse(func_node.args)
-    except AttributeError:
-        # Fallback: basic reconstruction
-        args = []
-        for arg in func_node.args.args:
-            arg_str = arg.arg
-            if arg.annotation:
-                arg_str += f": {ast.unparse(arg.annotation)}"
-            args.append(arg_str)
-        if func_node.args.vararg:
-            args.append(f"*{func_node.args.vararg.arg}")
-        args_str = "(" + ", ".join(args) + ")"
-    return f"{func_node.name}{args_str}"
+    sig: Dict[str, Any] = {'parameters': [], 'returns': None}
+    args = func_node.args
+    # Positional args
+    pos_args = args.args
+    defaults = [None] * (len(pos_args) - len(args.defaults)) + list(args.defaults)
+    for arg, default in zip(pos_args, defaults):
+        name = arg.arg
+        annotation = ast.unparse(arg.annotation) if arg.annotation else None
+        default_str = ast.unparse(default) if default is not None else None
+        sig['parameters'].append({'name': name, 'type': annotation, 'default': default_str})
+    # Vararg (*args)
+    if args.vararg:
+        name = args.vararg.arg
+        annotation = ast.unparse(args.vararg.annotation) if args.vararg.annotation else None
+        sig['parameters'].append({'name': f'*{name}', 'annotation': annotation, 'default': None})
+    # Keyword-only args
+    for kwarg, default in zip(args.kwonlyargs, args.kw_defaults):
+        name = kwarg.arg
+        annotation = ast.unparse(kwarg.annotation) if kwarg.annotation else None
+        default_str = ast.unparse(default) if default is not None else None
+        sig['parameters'].append({'name': name, 'annotation': annotation, 'default': default_str})
+    # Kwarg (**kwargs)
+    if args.kwarg:
+        name = args.kwarg.arg
+        annotation = ast.unparse(args.kwarg.annotation) if args.kwarg.annotation else None
+        sig['parameters'].append({'name': f'**{name}', 'annotation': annotation, 'default': None})
+    # Return annotation
+    if getattr(func_node, 'returns', None):
+        sig['returns'] = ast.unparse(func_node.returns)
+    return sig
+
 
 def index_file(file_path: Union[str, Path]) -> Dict[str, Any]:
     """
@@ -35,12 +53,19 @@ def index_file(file_path: Union[str, Path]) -> Dict[str, Any]:
       - imports: list of {'module': str, 'alias': Optional[str]}
       - constants: list of {'name': str, 'value': Any}
       - functions: list of {
-            'name': str, 'signature': str, 'docstring': Optional[str],
-            'decorators': List[str], 'calls': List[str]
+            'name': str,
+            'signature': {parameters: [...], returns: ...},
+            'docstring': Optional[str],
+            'decorators': List[str],
+            'calls': List[str]
         }
       - classes: list of {
-            'name': str, 'bases': List[str], 'docstring': Optional[str],
-            'decorators': List[str], 'attributes': List[Dict], 'methods': List[Dict]
+            'name': str,
+            'bases': List[str],
+            'docstring': Optional[str],
+            'decorators': List[str],
+            'attributes': List[Dict],
+            'methods': List[... same as functions ...]
         }
       - main_guard: True if `if __name__ == "__main__":` block exists
       - todos: list of TODO comment strings
@@ -57,25 +82,49 @@ def index_file(file_path: Union[str, Path]) -> Dict[str, Any]:
 
     # Imports
     imports: List[Dict[str, Optional[str]]] = []
+    imported_names = set()
     for node in tree.body:
         if isinstance(node, ast.Import):
             for alias in node.names:
+                alias_name = alias.asname or alias.name
                 imports.append({'module': alias.name, 'alias': alias.asname})
+                imported_names.add(alias_name)
         elif isinstance(node, ast.ImportFrom):
             module_name = node.module or ""
             for alias in node.names:
                 if alias.name == "*":
                     continue
                 full_name = f"{module_name}.{alias.name}" if module_name else alias.name
+                alias_name = alias.asname or alias.name
                 imports.append({'module': full_name, 'alias': alias.asname})
+                imported_names.add(alias_name)
 
-    # Global constants (simple assignments with constant values)
+    # Global constants
     constants: List[Dict[str, Any]] = []
     for node in tree.body:
-        if isinstance(node, ast.Assign):
-            if all(isinstance(t, ast.Name) for t in node.targets) and isinstance(node.value, ast.Constant):
-                for t in node.targets:
+        if isinstance(node, ast.Assign) and isinstance(node.value, ast.Constant):
+            for t in node.targets:
+                if isinstance(t, ast.Name):
                     constants.append({'name': t.id, 'value': node.value.value})
+
+    # Collect callable identifiers: top-level functions and imported names
+    defined_functions = {n.name for n in tree.body if isinstance(n, ast.FunctionDef)}
+    callable_names = defined_functions.union(imported_names)
+
+    # Helper to collect calls in a node
+    def collect_calls(node: ast.AST) -> List[str]:
+        calls = set()
+        for sub in ast.walk(node):
+            if isinstance(sub, ast.Call):
+                func = sub.func
+                if isinstance(func, ast.Name) and func.id in callable_names:
+                    calls.add(func.id)
+                elif isinstance(func, ast.Attribute) and isinstance(func.value, ast.Name):
+                    owner = func.value.id
+                    method = func.attr
+                    if owner in imported_names or owner in defined_functions:
+                        calls.add(f"{owner}.{method}")
+        return sorted(calls)
 
     # Functions
     functions: List[Dict[str, Any]] = []
@@ -83,20 +132,11 @@ def index_file(file_path: Union[str, Path]) -> Dict[str, Any]:
         if isinstance(node, ast.FunctionDef):
             func_info = {
                 'name': node.name,
-                'signature': make_signature(node),
+                'signature': get_signature(node),
                 'docstring': ast.get_docstring(node),
                 'decorators': [ast.unparse(d) for d in node.decorator_list],
-                'calls': []
+                'calls': collect_calls(node)
             }
-            # Collect function call names
-            calls = set()
-            for sub in ast.walk(node):
-                if isinstance(sub, ast.Call):
-                    if isinstance(sub.func, ast.Name):
-                        calls.add(sub.func.id)
-                    elif isinstance(sub.func, ast.Attribute):
-                        calls.add(sub.func.attr)
-            func_info['calls'] = sorted(calls)
             functions.append(func_info)
 
     # Classes
@@ -112,19 +152,17 @@ def index_file(file_path: Union[str, Path]) -> Dict[str, Any]:
                 'methods': []
             }
             for child in node.body:
-                if isinstance(child, ast.Assign):
+                if isinstance(child, ast.Assign) and isinstance(child.value, ast.Constant):
                     for t in child.targets:
-                        if isinstance(t, ast.Name) and isinstance(child.value, ast.Constant):
-                            class_info['attributes'].append({
-                                'name': t.id,
-                                'value': child.value.value
-                            })
+                        if isinstance(t, ast.Name):
+                            class_info['attributes'].append({'name': t.id, 'value': child.value.value})
                 elif isinstance(child, ast.FunctionDef):
                     method_info = {
                         'name': child.name,
-                        'signature': make_signature(child),
+                        'signature': get_signature(child),
                         'docstring': ast.get_docstring(child),
-                        'decorators': [ast.unparse(d) for d in child.decorator_list]
+                        'decorators': [ast.unparse(d) for d in child.decorator_list],
+                        'calls': collect_calls(child)
                     }
                     class_info['methods'].append(method_info)
             classes.append(class_info)
@@ -149,19 +187,16 @@ def index_file(file_path: Union[str, Path]) -> Dict[str, Any]:
         'todos': todos
     }
 
+
 def ast_index_modules(file_paths: List[Union[str, Path]]) -> List[Dict[str, Any]]:
     """
-    Index a list of Python files (e.g., an SCC), returning a list of
+    Index a list of Python files (e.g., an SCC), returning a flat list of
     metadata dictionaries for each file.
     """
-    results = []
+    results: List[Dict[str, Any]] = []
     for fp in file_paths:
         try:
             results.append(index_file(fp))
         except Exception as e:
-            # You might choose to log or handle errors differently
-            results.append({
-                'module': str(fp),
-                'error': str(e)
-            })
+            results.append({'module': str(fp), 'error': str(e)})
     return results
