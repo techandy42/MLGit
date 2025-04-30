@@ -108,9 +108,9 @@ def index_file(file_path: Union[str, Path]) -> Dict[str, Any]:
     # Module-level docstring
     module_docstring = ast.get_docstring(tree)
 
-    # Imports
+    # Imports (including nested scopes)
     imports: List[Dict[str, Optional[str]]] = []
-    for node in tree.body:
+    for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             for alias in node.names:
                 imports.append({'module': alias.name, 'alias': alias.asname})
