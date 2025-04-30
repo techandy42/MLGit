@@ -75,7 +75,7 @@ def main():
         init_repo(repo_root)
 
     elif args.command == "index":
-        schedule(repo_root, mode='test')
+        schedule(repo_root, mode='ast')
 
     else:
         parser.print_help()

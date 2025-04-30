@@ -43,6 +43,7 @@ Date: April 28, 2025
 
 import os
 import time
+import json
 from pathlib import Path
 from queue import PriorityQueue
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, wait, FIRST_COMPLETED
@@ -53,6 +54,7 @@ from mlgit.core.graph import (
     estimate_component_weights,
     compute_critical_path,
 )
+from mlgit.core.ast_indexer import ast_index_modules
 
 
 def test_index_modules(file_paths):
@@ -69,20 +71,6 @@ def test_index_modules(file_paths):
     # Sleep ~1 second per KiB of total file size
     seconds = total_bytes / 1024
     time.sleep(seconds)
-    return [str(p) for p in file_paths]
-
-
-def ast_index_modules(file_paths):
-    """
-    Placeholder for AST-based indexing of modules.
-
-    Args:
-        file_paths (List[Path]): Files in the SCC group.
-
-    Returns:
-        List[str]: The string paths of processed files.
-    """
-    # TODO: implement AST extraction & serialization
     return [str(p) for p in file_paths]
 
 
@@ -117,6 +105,7 @@ def schedule(repo_root: Path, max_workers: int = None, mode: str = 'llm'):
     if mode == 'ast':
         process_fn = ast_index_modules
         executor_cls = ProcessPoolExecutor
+        ast_results = []
     elif mode == 'llm':
         process_fn = llm_index_modules
         executor_cls = ThreadPoolExecutor
@@ -179,9 +168,11 @@ def schedule(repo_root: Path, max_workers: int = None, mode: str = 'llm'):
             done, _ = wait(futures.keys(), return_when=FIRST_COMPLETED)
             for fut in done:
                 comp = futures.pop(fut)
-                result_paths = fut.result()
-                if mode == 'test':
-                    processed_comps.append((comp, result_paths))
+                result = fut.result()
+                if mode == 'ast':
+                    ast_results.extend(result)
+                elif mode == 'test':
+                    processed_comps.append((comp, result))
 
                 # Enqueue dependents whose indegree drops to zero
                 for child in comp_out[comp]:
@@ -194,6 +185,14 @@ def schedule(repo_root: Path, max_workers: int = None, mode: str = 'llm'):
                 _, comp = ready.get()
                 future = executor.submit(process_fn, list(comp))
                 futures[future] = comp
+
+    # Print out final AST results in formatted manner
+    if mode == 'ast':
+        print("AST Analysis Results:")
+        for module_dict in ast_results:
+            print("-" * 40)
+            print(json.dumps(module_dict, indent=2, sort_keys=True))
+        print("-" * 40)
 
     # Print out final processing order, grouped by SCC in test mode
     if mode == 'test':
