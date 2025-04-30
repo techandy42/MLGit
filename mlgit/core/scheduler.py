@@ -88,7 +88,7 @@ def llm_index_modules(file_paths):
     return [str(p) for p in file_paths]
 
 
-def schedule(repo_root: Path, max_workers: int = None, mode: str = 'llm'):
+def schedule(repo_root: Path, max_workers: int = None, mode: str = 'test'):
     """
     Orchestrate parallel, dependency-aware indexing of Python files in a Git repo.
 
