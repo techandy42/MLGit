@@ -37,7 +37,7 @@ The core function `schedule(repo_root: Path, max_workers: int, mode: str)`:
 When invoked as a script (`__main__`), the scheduler runs in `test` mode by default.
 
 Author: Hokyung (Andy) Lee  
-Email: techandy42@gamil.com  
+Email: techandy42@gmail.com  
 Date: April 28, 2025
 """
 

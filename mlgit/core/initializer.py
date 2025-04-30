@@ -21,7 +21,7 @@ Exports:
 - `main()`: CLI entrypoint that calls `init_repo` on the current or provided path.
 
 Author: Hokyung (Andy) Lee
-Email: techandy42@gamil.com
+Email: techandy42@gmail.com
 Date: April 29, 2025
 """
 

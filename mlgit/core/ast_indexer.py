@@ -1,14 +1,45 @@
+"""
+Module: mlgit.core.ast_indexer
+
+This module provides AST-based extraction of Python file metadata, excluding call-resolution.
+
+Key functionalities:
+
+1) `get_signature`:
+   - Builds a nested signature dictionary for `FunctionDef` and `AsyncFunctionDef` nodes,
+     capturing parameter names, types, defaults, and return annotation.
+
+2) `index_file`:
+   - Parses a Python source file and extracts:
+     - Module-level docstring
+     - Import statements (`import` and `from ... import ...`)
+     - Top-level constant assignments
+     - Function definitions with signature, docstring, and decorators
+     - Class definitions with bases, docstring, decorators, attributes, and methods
+     - Detection of the `if __name__ == "__main__"` guard
+
+3) `ast_index_modules`:
+   - Applies `index_file` over a list of file paths, returning a list of metadata maps.
+
+Exports:
+- `get_signature`
+- `index_file`
+- `ast_index_modules`
+
+Author: Hokyung (Andy) Lee
+Email: techandy42@gmail.com
+Date: April 30, 2025
+"""
+
 from pathlib import Path
 import ast
-import re
 from typing import Any, Dict, List, Optional, Union
 
-TODO_PATTERN = re.compile(r'#\s*TODO[:\s]*(.*)')
 
 def get_signature(func_node: Union[ast.FunctionDef, ast.AsyncFunctionDef]) -> Dict[str, Any]:
     """
     Build a nested signature dict for a FunctionDef or AsyncFunctionDef node:
-      - parameters: list of {name: str, annotation: Optional[str], default: Optional[str]}
+      - parameters: list of {name: str, type: Optional[str], default: Optional[str]}
       - returns: Optional[str]
     """
     sig: Dict[str, Any] = {'parameters': [], 'returns': None}
@@ -25,18 +56,18 @@ def get_signature(func_node: Union[ast.FunctionDef, ast.AsyncFunctionDef]) -> Di
     if args.vararg:
         name = args.vararg.arg
         annotation = ast.unparse(args.vararg.annotation) if args.vararg.annotation else None
-        sig['parameters'].append({'name': f'*{name}', 'annotation': annotation, 'default': None})
+        sig['parameters'].append({'name': f'*{name}', 'type': annotation, 'default': None})
     # Keyword-only args
     for kwarg, default in zip(args.kwonlyargs, args.kw_defaults):
         name = kwarg.arg
         annotation = ast.unparse(kwarg.annotation) if kwarg.annotation else None
         default_str = ast.unparse(default) if default is not None else None
-        sig['parameters'].append({'name': name, 'annotation': annotation, 'default': default_str})
+        sig['parameters'].append({'name': name, 'type': annotation, 'default': default_str})
     # Kwarg (**kwargs)
     if args.kwarg:
         name = args.kwarg.arg
         annotation = ast.unparse(args.kwarg.annotation) if args.kwarg.annotation else None
-        sig['parameters'].append({'name': f'**{name}', 'annotation': annotation, 'default': None})
+        sig['parameters'].append({'name': f'**{name}', 'type': annotation, 'default': None})
     # Return annotation
     if getattr(func_node, 'returns', None):
         sig['returns'] = ast.unparse(func_node.returns)
@@ -56,8 +87,7 @@ def index_file(file_path: Union[str, Path]) -> Dict[str, Any]:
             'name': str,
             'signature': {parameters: [...], returns: ...},
             'docstring': Optional[str],
-            'decorators': List[str],
-            'calls': List[str]
+            'decorators': List[str]
         }
       - classes: list of {
             'name': str,
@@ -75,29 +105,22 @@ def index_file(file_path: Union[str, Path]) -> Dict[str, Any]:
     tree = ast.parse(source, filename=str(file_path))
 
     # Extract TODO comments
-    todos = TODO_PATTERN.findall(source)
-
     # Module-level docstring
     module_docstring = ast.get_docstring(tree)
 
     # Imports
     imports: List[Dict[str, Optional[str]]] = []
-    imported_names = set()
     for node in tree.body:
         if isinstance(node, ast.Import):
             for alias in node.names:
-                alias_name = alias.asname or alias.name
                 imports.append({'module': alias.name, 'alias': alias.asname})
-                imported_names.add(alias_name)
         elif isinstance(node, ast.ImportFrom):
             module_name = node.module or ""
             for alias in node.names:
                 if alias.name == "*":
                     continue
                 full_name = f"{module_name}.{alias.name}" if module_name else alias.name
-                alias_name = alias.asname or alias.name
                 imports.append({'module': full_name, 'alias': alias.asname})
-                imported_names.add(alias_name)
 
     # Global constants
     constants: List[Dict[str, Any]] = []
@@ -107,25 +130,6 @@ def index_file(file_path: Union[str, Path]) -> Dict[str, Any]:
                 if isinstance(t, ast.Name):
                     constants.append({'name': t.id, 'value': node.value.value})
 
-    # Collect callable identifiers: top-level functions and imported names
-    defined_functions = {n.name for n in tree.body if isinstance(n, ast.FunctionDef)}
-    callable_names = defined_functions.union(imported_names)
-
-    # Helper to collect calls in a node
-    def collect_calls(node: ast.AST) -> List[str]:
-        calls = set()
-        for sub in ast.walk(node):
-            if isinstance(sub, ast.Call):
-                func = sub.func
-                if isinstance(func, ast.Name) and func.id in callable_names:
-                    calls.add(func.id)
-                elif isinstance(func, ast.Attribute) and isinstance(func.value, ast.Name):
-                    owner = func.value.id
-                    method = func.attr
-                    if owner in imported_names or owner in defined_functions:
-                        calls.add(f"{owner}.{method}")
-        return sorted(calls)
-
     # Functions
     functions: List[Dict[str, Any]] = []
     for node in tree.body:
@@ -134,8 +138,7 @@ def index_file(file_path: Union[str, Path]) -> Dict[str, Any]:
                 'name': node.name,
                 'signature': get_signature(node),
                 'docstring': ast.get_docstring(node),
-                'decorators': [ast.unparse(d) for d in node.decorator_list],
-                'calls': collect_calls(node)
+                'decorators': [ast.unparse(d) for d in node.decorator_list]
             }
             functions.append(func_info)
 
@@ -161,8 +164,7 @@ def index_file(file_path: Union[str, Path]) -> Dict[str, Any]:
                         'name': child.name,
                         'signature': get_signature(child),
                         'docstring': ast.get_docstring(child),
-                        'decorators': [ast.unparse(d) for d in child.decorator_list],
-                        'calls': collect_calls(child)
+                        'decorators': [ast.unparse(d) for d in child.decorator_list]
                     }
                     class_info['methods'].append(method_info)
             classes.append(class_info)
@@ -183,9 +185,7 @@ def index_file(file_path: Union[str, Path]) -> Dict[str, Any]:
         'constants': constants,
         'functions': functions,
         'classes': classes,
-        'main_guard': main_guard,
-        'todos': todos
-    }
+        'main_guard': main_guard    }
 
 
 def ast_index_modules(file_paths: List[Union[str, Path]]) -> List[Dict[str, Any]]:

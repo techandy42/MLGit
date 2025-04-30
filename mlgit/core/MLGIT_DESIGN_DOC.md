@@ -166,3 +166,4 @@ mlgit index --rev <SHA>
 > - **Efficiency**: only new or changed blobs are written; diffs against nearest ancestor minimize work.  
 > - **Deduplication**: identical JSON outputs across commits stored once.  
 > - **Shareability**: manifests are small shareable pointers; objects can be packaged or served.  
+

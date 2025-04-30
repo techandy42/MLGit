@@ -24,7 +24,7 @@ Key Functions:
   and prints help for unsupported commands.
 
 Author: Hokyung (Andy) Lee  
-Email: techandy42@gamil.com  
+Email: techandy42@gmail.com  
 Date: April 28, 2025
 """
 

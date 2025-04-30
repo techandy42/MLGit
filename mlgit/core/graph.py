@@ -27,7 +27,7 @@ This module provides functions to analyze Python source files in a Git repositor
    - `print_import_graph`: Pretty-prints the import graph as JSON.
 
 Author: Hokyung (Andy) Lee
-Email: techandy42@gamil.com
+Email: techandy42@gmail.com
 Date: April 27, 2025
 """
 
