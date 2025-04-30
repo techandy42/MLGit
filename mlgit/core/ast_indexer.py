@@ -104,11 +104,10 @@ def index_file(file_path: Union[str, Path]) -> Dict[str, Any]:
     source = path.read_text(encoding="utf-8")
     tree = ast.parse(source, filename=str(file_path))
 
-    # Extract TODO comments
     # Module-level docstring
     module_docstring = ast.get_docstring(tree)
 
-    # Imports (including nested scopes)
+    # Imports
     imports: List[Dict[str, Optional[str]]] = []
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
