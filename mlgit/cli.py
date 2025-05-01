@@ -33,6 +33,7 @@ from pathlib import Path
 from mlgit.core.initializer import init_repo
 from mlgit.core.scheduler import schedule
 from mlgit.core.retriever import load_ast_results
+from mlgit.core.type_validator import resolve_imported_module_path
 
 
 def find_git_root() -> Path:
@@ -91,11 +92,19 @@ def main():
         # Temporary command for development
         ast_results = load_ast_results(repo_root)
         if args.pattern:
-            ast_results = [r for r in ast_results if args.pattern in r.get('module', '')]
+            ast_results_filtered = [r for r in ast_results if args.pattern in r.get('module', '')]
         print("AST Results:")
-        for result in ast_results:
+        for result in ast_results_filtered:
             print("-" * 40)
             print(json.dumps(result, indent=4))
+            imports  = result.get('imports', [])
+            module_path = Path(result.get('module', ''))
+            for imp in imports:
+                resolved_path = resolve_imported_module_path(imp, module_path, repo_root, ast_results)
+                if resolved_path:
+                    print(f"Resolved import: {imp} -> {resolved_path}")
+                else:
+                    print(f"Could not resolve import: {imp}")
         print("-" * 40)
 
     else:
