@@ -81,7 +81,7 @@ def index_file(file_path: Union[str, Path]) -> Dict[str, Any]:
     Returns a dictionary with:
       - module: module name or file path
       - docstring: module-level docstring
-      - imports: list of {'module': str, 'alias': Optional[str]}
+      - imports: list of {'module': str, 'alias': Optional[str], 'kind': str, 'level': int}
       - constants: list of {'name': str, 'value': Any}
       - functions: list of {
             'name': str,
@@ -108,18 +108,30 @@ def index_file(file_path: Union[str, Path]) -> Dict[str, Any]:
     module_docstring = ast.get_docstring(tree)
 
     # Imports
-    imports: List[Dict[str, Optional[str]]] = []
+    imports: List[Dict[str, Optional[Union[str,int]]]] = []
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             for alias in node.names:
-                imports.append({'module': alias.name, 'alias': alias.asname})
+                imports.append({
+                    'module': alias.name,
+                    'alias': alias.asname,
+                    'kind': 'absolute',
+                    'level': 0
+                })
         elif isinstance(node, ast.ImportFrom):
-            module_name = node.module or ""
+            level = node.level
+            kind = 'relative' if level and level > 0 else 'absolute'
+            module_base = node.module or ''
             for alias in node.names:
-                if alias.name == "*":
+                if alias.name == '*':
                     continue
-                full_name = f"{module_name}.{alias.name}" if module_name else alias.name
-                imports.append({'module': full_name, 'alias': alias.asname})
+                full_name = f"{module_base}.{alias.name}" if module_base else alias.name
+                imports.append({
+                    'module': full_name,
+                    'alias': alias.asname,
+                    'kind': kind,
+                    'level': level
+                })
 
     # Global constants
     constants: List[Dict[str, Any]] = []
