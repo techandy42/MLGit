@@ -196,7 +196,8 @@ def index_file(file_path: Union[str, Path]) -> Dict[str, Any]:
         'constants': constants,
         'functions': functions,
         'classes': classes,
-        'main_guard': main_guard    }
+        'main_guard': main_guard
+    }
 
 
 def ast_index_modules(file_paths: List[Union[str, Path]]) -> List[Dict[str, Any]]:
