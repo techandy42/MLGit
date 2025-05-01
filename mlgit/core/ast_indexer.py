@@ -1,7 +1,8 @@
 """
 Module: mlgit.core.ast_indexer
 
-This module provides AST-based extraction of Python file metadata, excluding call-resolution.
+This module provides AST-based extraction of Python file metadata,
+excluding call-resolution.
 
 Key functionalities:
 
@@ -15,16 +16,17 @@ Key functionalities:
      – module: the path or name of the file
      – docstring: module-level docstring
      – imports: list of {
-           module: str,      # imported module or symbol, e.g. "os", "math.sqrt"
-           alias: Optional[str],
-           kind: str,        # "absolute" or "relative"
-           level: int        # 0 for absolute, >0 for number of leading dots
+           module: str,              # imported module path (e.g., "os" or module base for from-import)
+           identifier: Optional[str], # specific name imported (None for broad imports)
+           alias: Optional[str],      # alias for module or identifier
+           kind: str,                # "absolute" or "relative"
+           level: int                # number of leading dots (0 for absolute, 1 for "from .module" imports, etc.)
        }
      – constants: list of {name: str, value: Any}
      – type_aliases: list of {name: str, definition: str}
      – functions: list of {
            name: str,
-           signature: {parameters: […], returns: …},
+           signature: {parameters: [...], returns: ...},
            docstring: Optional[str],
            decorators: List[str]
        }
@@ -34,7 +36,7 @@ Key functionalities:
            docstring: Optional[str],
            decorators: List[str],
            attributes: List[{name: str, value: Any}],
-           methods: List[…same as functions…]
+           methods: List[... same as functions ...]
        }
      – main_guard: bool (True if an `if __name__ == "__main__":` block exists)
 
@@ -102,7 +104,13 @@ def index_file(file_path: Union[str, Path]) -> Dict[str, Any]:
     Returns a dictionary with:
       - module: module name or file path
       - docstring: module-level docstring
-      - imports: list of {'module': str, 'alias': Optional[str], 'kind': str, 'level': int}
+      - imports: list of {
+            module: str,        # imported module path
+            identifier: Optional[str],  # name imported from module (None for broad imports)
+            alias: Optional[str],       # alias for module or identifier
+            kind: str,        # "absolute" or "relative"
+            level: int        # 0 for absolute, >0 for number of leading dots
+        }
       - constants: list of {'name': str, 'value': Any}
       - type_aliases: list of {'name': str, 'definition': str}
       - functions: list of {
@@ -128,13 +136,14 @@ def index_file(file_path: Union[str, Path]) -> Dict[str, Any]:
     # Module-level docstring
     module_docstring = ast.get_docstring(tree)
 
-    # Imports
+    # Imports: handle both `import module` and `from module import name1, name2`
     imports: List[Dict[str, Union[str,int]]] = []
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             for alias in node.names:
                 imports.append({
                     'module': alias.name,
+                    'identifier': None,
                     'alias': alias.asname,
                     'kind': 'absolute',
                     'level': 0
@@ -142,13 +151,13 @@ def index_file(file_path: Union[str, Path]) -> Dict[str, Any]:
         elif isinstance(node, ast.ImportFrom):
             level = node.level
             kind = 'relative' if level > 0 else 'absolute'
-            module_base = node.module or ''
+            base = node.module or ''
             for alias in node.names:
                 if alias.name == '*':
                     continue
-                full_name = f"{module_base}.{alias.name}" if module_base else alias.name
                 imports.append({
-                    'module': full_name,
+                    'module': base,
+                    'identifier': alias.name,
                     'alias': alias.asname,
                     'kind': kind,
                     'level': level
@@ -165,35 +174,30 @@ def index_file(file_path: Union[str, Path]) -> Dict[str, Any]:
     # Type aliases
     type_aliases: List[Dict[str, str]] = []
     for node in tree.body:
-        # Simple assignment alias (non-constant)
         if isinstance(node, ast.Assign) and not isinstance(node.value, ast.Constant):
             for t in node.targets:
                 if isinstance(t, ast.Name):
-                    alias_name = t.id
-                    definition = ast.unparse(node.value)
-                    type_aliases.append({'name': alias_name, 'definition': definition})
-        # Annotated assignment alias
+                    type_aliases.append({'name': t.id, 'definition': ast.unparse(node.value)})
         elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
-            alias_name = node.target.id
+            name = node.target.id
             if node.annotation:
                 definition = ast.unparse(node.annotation)
             elif node.value:
                 definition = ast.unparse(node.value)
             else:
                 continue
-            type_aliases.append({'name': alias_name, 'definition': definition})
+            type_aliases.append({'name': name, 'definition': definition})
 
     # Functions
     functions: List[Dict[str, Any]] = []
     for node in tree.body:
         if isinstance(node, ast.FunctionDef):
-            func_info = {
+            functions.append({
                 'name': node.name,
                 'signature': get_signature(node),
                 'docstring': ast.get_docstring(node),
                 'decorators': [ast.unparse(d) for d in node.decorator_list]
-            }
-            functions.append(func_info)
+            })
 
     # Classes
     classes: List[Dict[str, Any]] = []
@@ -213,13 +217,12 @@ def index_file(file_path: Union[str, Path]) -> Dict[str, Any]:
                         if isinstance(t, ast.Name):
                             class_info['attributes'].append({'name': t.id, 'value': child.value.value})
                 elif isinstance(child, ast.FunctionDef):
-                    method_info = {
+                    class_info['methods'].append({
                         'name': child.name,
                         'signature': get_signature(child),
                         'docstring': ast.get_docstring(child),
                         'decorators': [ast.unparse(d) for d in child.decorator_list]
-                    }
-                    class_info['methods'].append(method_info)
+                    })
             classes.append(class_info)
 
     # Detect main guard
