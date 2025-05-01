@@ -33,7 +33,7 @@ from pathlib import Path
 from mlgit.core.initializer import init_repo
 from mlgit.core.scheduler import schedule
 from mlgit.core.retriever import load_ast_results
-from mlgit.core.type_validator import resolve_imported_module_path
+from mlgit.core.type_validator import get_type_names
 
 
 def find_git_root() -> Path:
@@ -97,14 +97,9 @@ def main():
         for result in ast_results_filtered:
             print("-" * 40)
             print(json.dumps(result, indent=4))
-            imports  = result.get('imports', [])
             module_path = Path(result.get('module', ''))
-            for imp in imports:
-                resolved_path = resolve_imported_module_path(imp, module_path, repo_root, ast_results)
-                if resolved_path:
-                    print(f"Resolved import: {imp} -> {resolved_path}")
-                else:
-                    print(f"Could not resolve import: {imp}")
+            type_names = get_type_names(module_path, ast_results, repo_root)
+            print(json.dumps(type_names, indent=4))
         print("-" * 40)
 
     else:
