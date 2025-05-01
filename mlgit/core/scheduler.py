@@ -55,6 +55,8 @@ from mlgit.core.graph import (
     compute_critical_path,
 )
 from mlgit.core.ast_indexer import ast_index_modules
+from mlgit.core.storage import store_ast_results
+from mlgit.core.retriever import load_ast_results
 
 
 def test_index_modules(file_paths):
@@ -189,6 +191,16 @@ def schedule(repo_root: Path, max_workers: int = None, mode: str = 'test'):
     # Print out final AST results in formatted manner
     if mode == 'ast':
         print("AST Analysis Results:")
+        for module_dict in ast_results:
+            print("-" * 40)
+            print(json.dumps(module_dict, indent=2, sort_keys=True))
+        print("-" * 40)
+
+        store_ast_results(ast_results, repo_root)
+
+    if mode == 'llm':
+        ast_results = load_ast_results(repo_root)
+        print("Cached AST Analysis Results:")
         for module_dict in ast_results:
             print("-" * 40)
             print(json.dumps(module_dict, indent=2, sort_keys=True))
