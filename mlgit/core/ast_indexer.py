@@ -5,30 +5,51 @@ This module provides AST-based extraction of Python file metadata, excluding cal
 
 Key functionalities:
 
-1) `get_signature`:
-   - Builds a nested signature dictionary for `FunctionDef` and `AsyncFunctionDef` nodes,
-     capturing parameter names, types, defaults, and return annotation.
+1) get_signature(func_node)
+   • Builds a nested signature dictionary for FunctionDef and AsyncFunctionDef nodes:
+     – parameters: list of {name: str, type: Optional[str], default: Optional[str]}
+     – returns: Optional[str]
 
-2) `index_file`:
-   - Parses a Python source file and extracts:
-     - Module-level docstring
-     - Import statements (`import` and `from ... import ...`)
-     - Top-level constant assignments
-     - Function definitions with signature, docstring, and decorators
-     - Class definitions with bases, docstring, decorators, attributes, and methods
-     - Detection of the `if __name__ == "__main__"` guard
+2) index_file(file_path)
+   • Parses a Python source file and extracts:
+     – module: the path or name of the file
+     – docstring: module-level docstring
+     – imports: list of {
+           module: str,      # imported module or symbol, e.g. "os", "math.sqrt"
+           alias: Optional[str],
+           kind: str,        # "absolute" or "relative"
+           level: int        # 0 for absolute, >0 for number of leading dots
+       }
+     – constants: list of {name: str, value: Any}
+     – type_aliases: list of {name: str, definition: str}
+     – functions: list of {
+           name: str,
+           signature: {parameters: […], returns: …},
+           docstring: Optional[str],
+           decorators: List[str]
+       }
+     – classes: list of {
+           name: str,
+           bases: List[str],
+           docstring: Optional[str],
+           decorators: List[str],
+           attributes: List[{name: str, value: Any}],
+           methods: List[…same as functions…]
+       }
+     – main_guard: bool (True if an `if __name__ == "__main__":` block exists)
 
-3) `ast_index_modules`:
-   - Applies `index_file` over a list of file paths, returning a list of metadata maps.
+3) ast_index_modules(file_paths)
+   • Applies index_file over a list of file paths (e.g., each SCC) and
+     returns a flat list of metadata dictionaries for each module.
 
 Exports:
-- `get_signature`
-- `index_file`
-- `ast_index_modules`
+- get_signature
+- index_file
+- ast_index_modules
 
 Author: Hokyung (Andy) Lee
 Email: techandy42@gmail.com
-Date: April 30, 2025
+Date: April 31, 2025
 """
 
 from pathlib import Path
@@ -141,7 +162,7 @@ def index_file(file_path: Union[str, Path]) -> Dict[str, Any]:
                 if isinstance(t, ast.Name):
                     constants.append({'name': t.id, 'value': node.value.value})
 
-    # Type aliases (module-level)
+    # Type aliases
     type_aliases: List[Dict[str, str]] = []
     for node in tree.body:
         # Simple assignment alias (non-constant)
