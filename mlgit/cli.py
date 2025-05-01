@@ -94,7 +94,9 @@ def main():
             ast_results = [r for r in ast_results if args.pattern in r.get('module', '')]
         print("AST Results:")
         for result in ast_results:
+            print("-" * 40)
             print(json.dumps(result, indent=4))
+        print("-" * 40)
 
     else:
         parser.print_help()

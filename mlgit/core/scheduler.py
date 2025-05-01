@@ -193,7 +193,7 @@ def schedule(repo_root: Path, max_workers: int = None, mode: str = 'test'):
         print("AST Analysis Results:")
         for module_dict in ast_results:
             print("-" * 40)
-            print(json.dumps(module_dict, indent=2, sort_keys=True))
+            print(json.dumps(module_dict, indent=4, sort_keys=True))
         print("-" * 40)
 
         store_ast_results(ast_results, repo_root)
@@ -203,7 +203,7 @@ def schedule(repo_root: Path, max_workers: int = None, mode: str = 'test'):
         print("Cached AST Analysis Results:")
         for module_dict in ast_results:
             print("-" * 40)
-            print(json.dumps(module_dict, indent=2, sort_keys=True))
+            print(json.dumps(module_dict, indent=4, sort_keys=True))
         print("-" * 40)
 
     # Print out final processing order, grouped by SCC in test mode

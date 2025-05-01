@@ -83,6 +83,7 @@ def index_file(file_path: Union[str, Path]) -> Dict[str, Any]:
       - docstring: module-level docstring
       - imports: list of {'module': str, 'alias': Optional[str], 'kind': str, 'level': int}
       - constants: list of {'name': str, 'value': Any}
+      - type_aliases: list of {'name': str, 'definition': str}
       - functions: list of {
             'name': str,
             'signature': {parameters: [...], returns: ...},
@@ -98,7 +99,6 @@ def index_file(file_path: Union[str, Path]) -> Dict[str, Any]:
             'methods': List[... same as functions ...]
         }
       - main_guard: True if `if __name__ == "__main__":` block exists
-      - todos: list of TODO comment strings
     """
     path = Path(file_path)
     source = path.read_text(encoding="utf-8")
@@ -108,7 +108,7 @@ def index_file(file_path: Union[str, Path]) -> Dict[str, Any]:
     module_docstring = ast.get_docstring(tree)
 
     # Imports
-    imports: List[Dict[str, Optional[Union[str,int]]]] = []
+    imports: List[Dict[str, Union[str,int]]] = []
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             for alias in node.names:
@@ -120,7 +120,7 @@ def index_file(file_path: Union[str, Path]) -> Dict[str, Any]:
                 })
         elif isinstance(node, ast.ImportFrom):
             level = node.level
-            kind = 'relative' if level and level > 0 else 'absolute'
+            kind = 'relative' if level > 0 else 'absolute'
             module_base = node.module or ''
             for alias in node.names:
                 if alias.name == '*':
@@ -140,6 +140,27 @@ def index_file(file_path: Union[str, Path]) -> Dict[str, Any]:
             for t in node.targets:
                 if isinstance(t, ast.Name):
                     constants.append({'name': t.id, 'value': node.value.value})
+
+    # Type aliases (module-level)
+    type_aliases: List[Dict[str, str]] = []
+    for node in tree.body:
+        # Simple assignment alias (non-constant)
+        if isinstance(node, ast.Assign) and not isinstance(node.value, ast.Constant):
+            for t in node.targets:
+                if isinstance(t, ast.Name):
+                    alias_name = t.id
+                    definition = ast.unparse(node.value)
+                    type_aliases.append({'name': alias_name, 'definition': definition})
+        # Annotated assignment alias
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+            alias_name = node.target.id
+            if node.annotation:
+                definition = ast.unparse(node.annotation)
+            elif node.value:
+                definition = ast.unparse(node.value)
+            else:
+                continue
+            type_aliases.append({'name': alias_name, 'definition': definition})
 
     # Functions
     functions: List[Dict[str, Any]] = []
@@ -194,6 +215,7 @@ def index_file(file_path: Union[str, Path]) -> Dict[str, Any]:
         'docstring': module_docstring,
         'imports': imports,
         'constants': constants,
+        'type_aliases': type_aliases,
         'functions': functions,
         'classes': classes,
         'main_guard': main_guard
