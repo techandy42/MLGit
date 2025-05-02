@@ -1,5 +1,38 @@
+"""
+Module: mlgit.core.type_validator
+
+This module provides utilities for mapping import statements to in-repo modules,
+extracting available classes and type aliases (both local and linked), and validating
+LLM-generated type annotations against a strict, deterministic type policy.
+
+Key functions:
+
+1) resolve_imported_module_path(imp, target_module_path, repo_root, ast_results) -> Optional[Path]
+   • Given a single AST-extracted import dict, computes the absolute file path of the
+     referenced module within the repository (or returns None if it’s external).
+
+2) get_type_names(target_module_path, ast_results, repo_root) -> Dict[str, Any]
+   • For a given module path, gathers:
+       – internal_classes: detailed metadata for every class defined or imported broadly
+       – internal_type_aliases: every type alias defined or imported broadly
+       – external_modules: module names imported but unresolved in ast_results
+       – external_identifiers: specific names imported from unresolved external modules
+
+3) validate_type(annotation, internal_classes, internal_type_aliases,
+                 external_identifiers, external_modules) -> bool
+   • Parses an annotation string and ensures it only uses:
+       – Built-ins and typing generics (e.g., int, List[T], Optional[U], Callable[..., R])
+       – Project-defined classes and type aliases
+       – Qualified names from recognized external modules
+       – Nested combinations thereof
+
+Author: Hokyung (Andy) Lee
+Email: techandy42@gmail.com
+Date: May 1, 2025
+"""
+
 from pathlib import Path
-from typing import Dict, Any, List, Optional, Set
+from typing import Dict, Any, List, Optional, Set, Tuple
 
 
 def resolve_imported_module_path(
@@ -62,7 +95,6 @@ def get_type_names(
     external_modules: Set[str] = set()
     external_identifiers: Dict[str, str] = {}
 
-    # Collect own classes
     for cls in module_meta.get('classes', []):
         name = cls.get('name')
         if name:
@@ -72,13 +104,11 @@ def get_type_names(
                 'methods': cls.get('methods', [])
             }
 
-    # Collect own type aliases
     for alias in module_meta.get('type_aliases', []):
         name = alias.get('name')
         if name:
             internal_type_aliases[name] = alias.get('definition')
 
-    # Classify imports
     imports = module_meta.get('imports', [])
     broad_imports: Set[str] = set()
     specific_imports: Dict[str, Set[str]] = {}
@@ -91,12 +121,10 @@ def get_type_names(
         else:
             specific_imports.setdefault(mod_base, set()).add(ident)
 
-    # If broad import exists, drop specific
     for mod in list(specific_imports):
         if mod in broad_imports:
             del specific_imports[mod]
 
-    # Handle broad imports
     for mod in broad_imports:
         imp_entry = {'module': mod, 'kind': 'absolute', 'level': 0}
         path = resolve_imported_module_path(
@@ -125,7 +153,6 @@ def get_type_names(
             if name:
                 internal_type_aliases[f"{mod}.{name}"] = alias.get('definition')
 
-    # Handle specific imports
     for mod, idents in specific_imports.items():
         imp_entry = {'module': mod, 'kind': 'absolute', 'level': 0}
         path = resolve_imported_module_path(
@@ -157,9 +184,92 @@ def get_type_names(
                 alias = alias_map[ident]
                 internal_type_aliases[ident] = alias.get('definition')
 
-    return {
+    result = {
         'internal_classes': internal_classes,
         'internal_type_aliases': internal_type_aliases,
         'external_modules': sorted(external_modules),
         'external_identifiers': external_identifiers
     }
+
+    return result
+
+
+def validate_type(
+    annotation: str,
+    internal_classes: Set[str],
+    internal_type_aliases: Set[str],
+    external_identifiers: Set[str],
+    external_modules: Set[str]
+) -> bool:
+    """
+    Validate that `annotation` is a valid type under strict rules:
+      - Basic types: int, float, complex, str, bool, bytes, bytearray, memoryview, Any, None
+      - Custom types: names in internal_classes or internal_type_aliases
+      - External identifiers: names imported from external modules
+      - External modules: module names used in qualified names
+      - Generic containers: List, Dict, Tuple, Set, FrozenSet,
+        Deque, DefaultDict, Counter, OrderedDict, Iterable, Iterator,
+        Sequence, MutableSequence, Mapping, MutableMapping,
+        AbstractSet, Container, Collection, Reversible, Callable,
+        Awaitable, Coroutine, AsyncIterable, AsyncIterator,
+        AsyncContextManager, Generator, AsyncGenerator, Optional, Union,
+        Literal, Final, ClassVar, Type, NoReturn, Annotated,
+        and their lowercase built-in counterparts.
+    """
+    s = annotation.replace(' ', '')
+    containers = {
+        'List','Dict','Tuple','Set','FrozenSet',
+        'Deque','DefaultDict','Counter','OrderedDict',
+        'Iterable','Iterator','Sequence','MutableSequence',
+        'Mapping','MutableMapping',
+        'AbstractSet','Container','Collection','Reversible',
+        'Callable','Awaitable','Coroutine',
+        'AsyncIterable','AsyncIterator','AsyncContextManager',
+        'Generator','AsyncGenerator',
+        'Optional','Union','Literal','Final','ClassVar','Type',
+        'NoReturn','Annotated',
+        'list','dict','tuple','set','frozenset','range'
+    }
+    basic = {
+        'int','float','complex','str','bool','bytes','bytearray',
+        'memoryview','Any','None'
+    }
+    simple_allowed = basic.union(internal_classes, internal_type_aliases, external_identifiers)
+
+    def parse_type(s: str, i: int) -> Tuple[bool, int]:
+        n = len(s)
+        j = i
+        while j < n and (s[j].isalnum() or s[j]=='_' or s[j]=='.'):
+            j += 1
+        if j == i:
+            return False, i
+        name = s[i:j]
+        if j < n and s[j] == '[':
+            if name not in containers:
+                return False, i
+            j += 1
+            ok, j = parse_args(s, j)
+            if not ok or j >= n or s[j] != ']':
+                return False, i
+            return True, j+1
+        if name in simple_allowed:
+            return True, j
+        prefix = name.split('.',1)[0]
+        if prefix in external_modules:
+            return True, j
+        return False, i
+
+    def parse_args(s: str, i: int) -> Tuple[bool, int]:
+        ok, j = parse_type(s, i)
+        if not ok:
+            return False, i
+        n = len(s)
+        while j < n and s[j] == ',':
+            j += 1
+            ok, j = parse_type(s, j)
+            if not ok:
+                return False, i
+        return True, j
+
+    ok, pos = parse_type(s, 0)
+    return ok and pos == len(s)

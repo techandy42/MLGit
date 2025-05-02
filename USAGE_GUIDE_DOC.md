@@ -24,3 +24,19 @@ mlgit init
 mlgit index
 ```
 
+---
+
+## Activating Virtual Environment
+
+```bash
+source .venv/bin/activate
+```
+
+---
+
+## Running Tests
+
+```bash
+pip install pytest # If not already installed
+pytest
+```
