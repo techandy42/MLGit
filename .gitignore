@@ -3,3 +3,4 @@
 # Build artifacts
 dist/
 __pycache__/
+.pytest_cache/
