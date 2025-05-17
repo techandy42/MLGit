@@ -18,7 +18,7 @@ within a Git repository. Supports four modes of operation:
    - Uses a ThreadPoolExecutor to sleep proportional to file sizes, simulating work.
 
 The core function `schedule(repo_root: Path, max_workers: int, mode: str)`:
-  - Constructs the import graph and finds SCCs via Tarjan’s algorithm.
+  - Constructs the import graph and finds SCCs via Tarjan's algorithm.
   - Estimates component weights and computes critical-path lengths for prioritization.
   - Maintains a max-heap of ready components and dispatches tasks to the selected executor.
   - In `ast` mode, gathers AST results and writes them to storage.
@@ -98,8 +98,7 @@ def schedule(repo_root: Path, max_workers: int = None, mode: str = 'test'):
         max_workers (int, optional): Number of parallel worker processes (defaults to CPU count).
         mode (str): One of 'ast', 'llm_types', 'llm_docs', or 'test'.
     """
-    if max_workers is None:
-        max_workers = os.cpu_count() or 1
+    max_workers = max_workers or os.cpu_count() or 1
 
     if mode == 'ast':
         process_fn = ast_index_modules
