@@ -69,9 +69,23 @@ def test_index_modules(file_paths):
     return [str(p) for p in file_paths]
 
 
-def llm_index_modules(file_paths):
+def llm_type_inference_modules(file_paths):
     """
-    Placeholder for LLM-based enrichment of modules.
+    Placeholder for LLM-based type inference of modules.
+
+    Args:
+        file_paths (List[Path]): Files in the SCC group.
+
+    Returns:
+        List[str]: The string paths of processed files.
+    """
+    # TODO: implement LLM request & enrichment
+    return [str(p) for p in file_paths]
+
+
+def llm_docstring_generation_modules(file_paths):
+    """
+    Placeholder for LLM-based docstring generation of modules.
 
     Args:
         file_paths (List[Path]): Files in the SCC group.
@@ -104,8 +118,11 @@ def schedule(repo_root: Path, max_workers: int = None, mode: str = 'test'):
         process_fn = ast_index_modules
         executor_cls = ProcessPoolExecutor
         ast_results = []
-    elif mode in ('llm_types', 'llm_docs'):
-        process_fn = llm_index_modules
+    elif mode == 'llm_types':
+        process_fn = llm_type_inference_modules
+        executor_cls = ThreadPoolExecutor
+    elif mode == 'llm_docs':
+        process_fn = llm_docstring_generation_modules
         executor_cls = ThreadPoolExecutor
     elif mode == 'test':
         process_fn = test_index_modules
@@ -179,7 +196,15 @@ def schedule(repo_root: Path, max_workers: int = None, mode: str = 'test'):
         print("-" * 40)
         store_ast_results(ast_results, repo_root)
 
-    if mode in ('llm_types', 'llm_docs'):
+    if mode == 'llm_types':
+        ast_results = load_ast_results(repo_root)
+        print("Cached AST Analysis Results:")
+        for module_dict in ast_results:
+            print("-" * 40)
+            print(json.dumps(module_dict, indent=4, sort_keys=True))
+        print("-" * 40)
+
+    if mode == 'llm_docs':
         ast_results = load_ast_results(repo_root)
         print("Cached AST Analysis Results:")
         for module_dict in ast_results:
