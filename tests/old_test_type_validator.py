@@ -1,6 +1,6 @@
 import pytest
 from pathlib import Path
-from mlgit.core.type_validator import validate_type
+from mlgit.core.old_type_validator import validate_type
 
 
 @pytest.fixture
