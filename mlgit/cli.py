@@ -33,7 +33,7 @@ from pathlib import Path
 from mlgit.core.initializer import init_repo
 from mlgit.core.scheduler import schedule
 from mlgit.core.retriever import load_ast_results
-from mlgit.core.type_validator import get_type_names
+from mlgit.core.old_type_validator import get_type_names
 
 
 def find_git_root() -> Path:
