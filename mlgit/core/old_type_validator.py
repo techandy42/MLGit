@@ -1,5 +1,5 @@
 """
-Module: mlgit.core.type_validator
+Module: mlgit.core.old_type_validator
 
 This module provides utilities for mapping import statements to in-repo modules,
 extracting available classes and type aliases (both local and linked), and validating
