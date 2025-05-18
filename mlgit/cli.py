@@ -97,6 +97,8 @@ def main():
         ast_results = load_ast_results(repo_root)
         if args.pattern:
             ast_results_filtered = [r for r in ast_results if args.pattern in r.get('module', '')]
+        else:
+            ast_results_filtered = ast_results
         print("Filtered AST Results:")
         for result in ast_results_filtered:
             print("-" * 40)
