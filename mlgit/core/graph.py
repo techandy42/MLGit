@@ -36,9 +36,11 @@ import subprocess
 import json
 from pathlib import Path
 from collections import defaultdict, deque
-from typing import Dict, Set, FrozenSet, List
+from typing import Dict, Set, FrozenSet, List, TypeAlias
 
-def build_import_graph(repo_root: Path) -> Dict[Path, Set[Path]]:
+ImportGraph: TypeAlias = Dict[Path, Set[Path]]
+
+def build_import_graph(repo_root: Path) -> ImportGraph:
     """
     Walk the committed .py files in the repo and build a graph where each
     file maps to the set of other files it imports.
@@ -59,7 +61,7 @@ def build_import_graph(repo_root: Path) -> Dict[Path, Set[Path]]:
         module_map[".".join(rel.with_suffix("").parts)] = f
 
     # 3) Parse each file and resolve imports via longest-prefix match
-    graph: Dict[Path, Set[Path]] = defaultdict(set)
+    graph: ImportGraph = defaultdict(set)
     for f in py_files:
         text = f.read_text(encoding="utf-8")
         tree = ast.parse(text, filename=str(f))
@@ -97,7 +99,7 @@ def build_import_graph(repo_root: Path) -> Dict[Path, Set[Path]]:
     return graph
 
 
-def find_sccs(graph: Dict[Path, Set[Path]]) -> Set[FrozenSet[Path]]:
+def find_sccs(graph: ImportGraph) -> Set[FrozenSet[Path]]:
     """
     Tarjan’s algorithm, returning each strongly‐connected component as a frozenset.
     """
@@ -183,7 +185,7 @@ def compute_critical_path(
     return cp
 
 
-def print_import_graph(graph: Dict[Path, Set[Path]]) -> None:
+def print_import_graph(graph: ImportGraph) -> None:
     """
     Pretty-print the import graph as JSON.
     """
