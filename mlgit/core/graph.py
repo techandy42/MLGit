@@ -38,7 +38,9 @@ from pathlib import Path
 from collections import defaultdict, deque
 from typing import Dict, Set, FrozenSet, List, TypeAlias
 
+
 ImportGraph: TypeAlias = Dict[Path, Set[Path]]
+
 
 def build_import_graph(repo_root: Path) -> ImportGraph:
     """
