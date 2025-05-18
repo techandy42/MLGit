@@ -53,4 +53,5 @@ source .venv/bin/activate
 ```bash
 pip install pytest # If not already installed
 pytest
+pytest tests/graph_test.py -vv -s
 ```

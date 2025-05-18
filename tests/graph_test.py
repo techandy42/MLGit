@@ -1,9 +1,10 @@
 import pytest
 import subprocess
 import shutil
+import json
 from pathlib import Path
 from mlgit.core.utils import find_git_root
-from mlgit.core.graph import build_import_graph
+from mlgit.core.graph import build_import_graph, serialize_import_graph
 
 # List of test repositories
 TEST_REPOS = [
@@ -50,10 +51,22 @@ def test_import_graph_building(cloned_repos):
     for repo_path in cloned_repos:
         # Test that we can find the git root
         git_root = find_git_root()
-        assert git_root is not None
+        assert git_root is not None, "Failed to find git root directory"
         
         # Test building the import graph
         graph = build_import_graph(repo_path)
-        print(graph)
-        assert graph is not None
-        # Add more specific assertions based on your graph structure
+        assert graph is not None, "Failed to build import graph"
+        
+        # Serialize the graph using the dedicated function
+        serialized_graph = serialize_import_graph(graph)
+        
+        # Check if import_graph.json exists in the repo
+        import_graph_path = repo_path / "import_graph.json"
+        if import_graph_path.exists():
+            # Load the stored graph
+            with open(import_graph_path) as f:
+                stored_graph = json.load(f)
+
+            # Compare the graphs
+            assert serialized_graph == stored_graph, \
+                "Built graph does not match stored import_graph.json"

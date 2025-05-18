@@ -39,7 +39,7 @@ from mlgit.core.initializer import init_repo
 from mlgit.core.scheduler import schedule
 from mlgit.core.retriever import load_ast_results
 from mlgit.core.old_type_validator import get_type_names
-from mlgit.core.graph import build_import_graph, print_import_graph
+from mlgit.core.graph import build_import_graph, serialize_import_graph
 
 
 def main():
@@ -83,9 +83,10 @@ def main():
             sys.exit(1)
             
         graph = build_import_graph(repo_root)
+        serialized_graph = serialize_import_graph(graph)
         print("\nImport Graph:")
         print("-" * 40)
-        print_import_graph(graph)
+        print(json.dumps(serialized_graph, indent=4))
         print("-" * 40)
     elif args.command == "debug-ast-results-retrieve":
         # Development-only command

@@ -24,7 +24,7 @@ This module provides functions to analyze Python source files in a Git repositor
      via a reverse topological DP.
 
 5) Utilities
-   - `print_import_graph`: Pretty-prints the import graph as JSON.
+   - `serialize_import_graph`: Serialize the import graph to a dictionary with normalized paths.
 
 Author: Hokyung (Andy) Lee
 Email: techandy42@gmail.com
@@ -32,6 +32,7 @@ Date: April 27, 2025
 """
 
 import ast
+import os
 import subprocess
 import json
 from pathlib import Path
@@ -187,12 +188,30 @@ def compute_critical_path(
     return cp
 
 
-def print_import_graph(graph: ImportGraph) -> None:
+def serialize_import_graph(graph: ImportGraph) -> Dict[str, List[str]]:
     """
-    Pretty-print the import graph as JSON.
+    Serialize the import graph to a dictionary with normalized paths.
+    All paths are converted to be relative to the repository root.
     """
-    serializable = {
-        str(src): sorted(str(dst) for dst in dsts)
-        for src, dsts in graph.items()
-    }
-    print(json.dumps(serializable, indent=4))
+    # Find the common root directory of all paths
+    all_paths = list(graph.keys()) + [dst for dsts in graph.values() for dst in dsts]
+    if not all_paths:
+        return {}
+    
+    # Get the common root directory
+    repo_root = Path(all_paths[0]).parent
+    for path in all_paths[1:]:
+        try:
+            repo_root = Path(os.path.commonpath([str(repo_root), str(path)]))
+        except ValueError:
+            # If paths are on different drives, use the first path's parent
+            break
+    
+    # Serialize with normalized paths
+    serialized_graph = {}
+    for src, dsts in graph.items():
+        rel_src = str(Path(src).relative_to(repo_root))
+        rel_dsts = sorted(str(Path(dst).relative_to(repo_root)) for dst in dsts)
+        serialized_graph[rel_src] = rel_dsts
+    
+    return serialized_graph
