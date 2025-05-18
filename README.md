@@ -44,7 +44,7 @@ Contributions are encouraged! Please open issues or submit pull requests for bug
 
 ---
 
-## 📈 Progress
+## 📈 Progress [for v0]
 
 - [x]  Command Line Interface [Being able to execute the program in command line at an external location]
     - [ ]  Build a test for CLI commands later on
