@@ -1,6 +1,10 @@
 # Virtual environments
 .venv/
+
 # Build artifacts
 dist/
 __pycache__/
 .pytest_cache/
+
+# Test repos
+tests/test_repos/

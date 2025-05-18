@@ -195,4 +195,4 @@ def print_import_graph(graph: ImportGraph) -> None:
         str(src): sorted(str(dst) for dst in dsts)
         for src, dsts in graph.items()
     }
-    print(json.dumps(serializable, indent=2))
+    print(json.dumps(serializable, indent=4))

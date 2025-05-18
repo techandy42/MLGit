@@ -13,6 +13,20 @@ poetry --directory /Users/andylee/Desktop/summer_2025/MLGit \
 
 ---
 
+## Running Development Commands Locally
+
+```bash
+export MLGIT_DEV_MODE=1
+poetry --directory /Users/andylee/Desktop/summer_2025/MLGit \
+       run python -m mlgit.cli debug-graph
+poetry --directory /Users/andylee/Desktop/summer_2025/MLGit \
+       run python -m mlgit.cli debug-ast-results-retrieve
+poetry --directory /Users/andylee/Desktop/summer_2025/MLGit \
+       run python -m mlgit.cli debug-ast-results-retrieve -p "<file-pattern>"
+```
+
+---
+
 ## Installing Locally
 
 ```bash
