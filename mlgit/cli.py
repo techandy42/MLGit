@@ -38,7 +38,6 @@ from mlgit.core.utils import find_git_root
 from mlgit.core.initializer import init_repo
 from mlgit.core.scheduler import schedule
 from mlgit.core.retriever import load_ast_results
-from mlgit.core.old_type_validator import get_type_names
 from mlgit.core.graph import build_import_graph, serialize_import_graph
 
 
@@ -102,9 +101,6 @@ def main():
         for result in ast_results_filtered:
             print("-" * 40)
             print(json.dumps(result, indent=4))
-            module_path = Path(result.get('module', ''))
-            type_names = get_type_names(module_path, ast_results, repo_root)
-            print(json.dumps(type_names, indent=4))
         print("-" * 40)
     else:
         parser.print_help()
