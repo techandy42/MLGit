@@ -17,45 +17,21 @@ subcommands to initialize, index, and (temporary) retrieve AST results:
    - Optionally filters by a simple substring pattern on file paths.
 
 Key Functions:
-- `find_git_root() -> Path`
 - `main()`
 
 Author: Hokyung (Andy) Lee
 Email: techandy42@gmail.com
 Date: April 28, 2025
 """
+
 import argparse
-import os
-import subprocess
-import sys
 import json
 from pathlib import Path
+from mlgit.core.utils import find_git_root
 from mlgit.core.initializer import init_repo
 from mlgit.core.scheduler import schedule
 from mlgit.core.retriever import load_ast_results
 from mlgit.core.old_type_validator import get_type_names
-
-
-def find_git_root() -> Path:
-    """
-    Look in the original shell directory (from $PWD) for the Git root.
-    If PWD isn’t set or it’s not inside a Git repo, exit with an error.
-    """
-    shell_pwd = os.environ.get("PWD")
-    if not shell_pwd:
-        print("Error: could not determine your working directory (PWD is unset)", file=sys.stderr)
-        sys.exit(1)
-
-    search_dir = Path(shell_pwd)
-    try:
-        top = subprocess.check_output(
-            ["git", "rev-parse", "--show-toplevel"],
-            cwd=str(search_dir), stderr=subprocess.DEVNULL
-        ).decode().strip()
-        return Path(top)
-    except subprocess.CalledProcessError:
-        print(f"Error: '{search_dir}' is not inside a Git repository", file=sys.stderr)
-        sys.exit(1)
 
 
 def main():
