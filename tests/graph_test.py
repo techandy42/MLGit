@@ -8,7 +8,8 @@ from mlgit.core.graph import build_import_graph, serialize_import_graph
 
 # List of test repositories
 TEST_REPOS = [
-    "https://github.com/techandy42/MLGit_Test_Repo_N1"
+    "https://github.com/techandy42/MLGit_Test_Repo_N1",
+    "https://github.com/techandy42/MLGit_Test_Repo_N2",
 ]
 
 @pytest.fixture(scope="session")
