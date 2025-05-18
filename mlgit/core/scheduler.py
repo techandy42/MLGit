@@ -2,19 +2,16 @@
 Module: mlgit.core.scheduler
 
 Orchestrates parallel, dependency-aware indexing and enrichment of Python source files
-within a Git repository. Supports four modes of operation:
+within a Git repository. Supports three modes of operation:
 
-1) Static Analysis (`ast`)
+1) AST Code Analysis (`ast`)
    - Uses a ProcessPoolExecutor to perform AST-based extraction for each strongly-connected
      component (SCC) of the import graph.
 
-2) LLM-Based Type Inference (`llm_types`)
-   - Uses a ThreadPoolExecutor as a placeholder for an LLM pass to infer missing types.
-
-3) LLM-Based Docstring Generation (`llm_docs`)
+2) LLM Docstring Generation (`llm_docs`)
    - Uses a ThreadPoolExecutor as a placeholder for an LLM pass to generate docstrings.
 
-4) Test Simulation (`test`)
+3) Test Simulation (`test`)
    - Uses a ThreadPoolExecutor to sleep proportional to file sizes, simulating work.
 
 The core function `schedule(repo_root: Path, max_workers: int, mode: str)`:
@@ -22,17 +19,15 @@ The core function `schedule(repo_root: Path, max_workers: int, mode: str)`:
   - Estimates component weights and computes critical-path lengths for prioritization.
   - Maintains a max-heap of ready components and dispatches tasks to the selected executor.
   - In `ast` mode, gathers AST results and writes them to storage.
-  - In `llm_types` and `llm_docs` modes, loads cached AST results and invokes LLM enrichment.
+  - In `llm_docs` modes, loads cached AST results and invokes LLM enrichment.
   - In `test` mode, prints simulated processing order.
 
 Exports:
-- test_index_modules
-- llm_index_modules
-- schedule
+- `schedule(repo_root: Path, max_workers: int = None, mode: str = 'test')`
 
 Author: Hokyung (Andy) Lee
 Email: techandy42@gmail.com
-Date: April 28, 2025
+Date: May 17, 2025
 """
 
 from pathlib import Path
@@ -69,20 +64,6 @@ def test_index_modules(file_paths):
     return [str(p) for p in file_paths]
 
 
-def llm_type_inference_modules(file_paths):
-    """
-    Placeholder for LLM-based type inference of modules.
-
-    Args:
-        file_paths (List[Path]): Files in the SCC group.
-
-    Returns:
-        List[str]: The string paths of processed files.
-    """
-    # TODO: implement LLM request & enrichment
-    return [str(p) for p in file_paths]
-
-
 def llm_docstring_generation_modules(file_paths):
     """
     Placeholder for LLM-based docstring generation of modules.
@@ -102,15 +83,14 @@ def schedule(repo_root: Path, max_workers: int = None, mode: str = 'test'):
     Orchestrate parallel, dependency-aware indexing of Python files in a Git repo.
 
     Modes:
-      - 'ast': AST-only analysis pass
-      - 'llm_types': LLM-based type inference pass (placeholder)
-      - 'llm_docs': LLM-based docstring generation pass (placeholder)
-      - 'test': simulation pass for testing scheduler behavior
+      - 'ast': AST code analysis
+      - 'llm_docs': LLM docstring generation
+      - 'test': Simulated processing for testing scheduler behavior
 
     Args:
         repo_root (Path): Path to the Git repository root.
         max_workers (int, optional): Number of parallel worker processes (defaults to CPU count).
-        mode (str): One of 'ast', 'llm_types', 'llm_docs', or 'test'.
+        mode (str): One of 'ast', 'llm_docs', or 'test'.
     """
     max_workers = max_workers or os.cpu_count() or 1
 
@@ -118,9 +98,6 @@ def schedule(repo_root: Path, max_workers: int = None, mode: str = 'test'):
         process_fn = ast_index_modules
         executor_cls = ProcessPoolExecutor
         ast_results = []
-    elif mode == 'llm_types':
-        process_fn = llm_type_inference_modules
-        executor_cls = ThreadPoolExecutor
     elif mode == 'llm_docs':
         process_fn = llm_docstring_generation_modules
         executor_cls = ThreadPoolExecutor
@@ -128,7 +105,7 @@ def schedule(repo_root: Path, max_workers: int = None, mode: str = 'test'):
         process_fn = test_index_modules
         executor_cls = ThreadPoolExecutor
     else:
-        raise ValueError(f"Unknown mode: {mode}. Expected 'ast', 'llm_types', 'llm_docs', or 'test'.")
+        raise ValueError(f"Unknown mode: {mode}. Expected 'ast', 'llm_docs', or 'test'.")
 
     graph = build_import_graph(repo_root)
     sccs = find_sccs(graph)
@@ -189,28 +166,10 @@ def schedule(repo_root: Path, max_workers: int = None, mode: str = 'test'):
                 futures[future] = comp
 
     if mode == 'ast':
-        print("AST Analysis Results:")
-        for module_dict in ast_results:
-            print("-" * 40)
-            print(json.dumps(module_dict, indent=4, sort_keys=True))
-        print("-" * 40)
         store_ast_results(ast_results, repo_root)
-
-    if mode == 'llm_types':
-        ast_results = load_ast_results(repo_root)
-        print("Cached AST Analysis Results:")
-        for module_dict in ast_results:
-            print("-" * 40)
-            print(json.dumps(module_dict, indent=4, sort_keys=True))
-        print("-" * 40)
 
     if mode == 'llm_docs':
         ast_results = load_ast_results(repo_root)
-        print("Cached AST Analysis Results:")
-        for module_dict in ast_results:
-            print("-" * 40)
-            print(json.dumps(module_dict, indent=4, sort_keys=True))
-        print("-" * 40)
 
     if mode == 'test':
         print("Processing order:")
